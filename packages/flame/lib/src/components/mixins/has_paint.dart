@@ -84,7 +84,7 @@ mixin HasPaint<T extends Object> on Component
     }
 
     setColor(
-      getPaint(paintId).color.withValues(alpha: opacity),
+      getPaint(paintId).color.withOpacity(alpha: opacity),
       paintId: paintId,
     );
   }
@@ -125,9 +125,9 @@ mixin HasPaint<T extends Object> on Component
 
   @override
   set opacity(double value) {
-    paint.color = paint.color.withValues(alpha: value);
+    paint.color = paint.color.withOpacity(alpha: value);
     for (final paint in _paints.values) {
-      paint.color = paint.color.withValues(alpha: value);
+      paint.color = paint.color.withOpacity(alpha: value);
     }
   }
 
@@ -232,7 +232,7 @@ class _MultiPaintOpacityProvider<T extends Object> implements OpacityProvider {
       for (var i = 0; i < (paintLayersInternal?.length ?? 0); ++i) {
         paintLayersInternal![i].color = paintLayersInternal[i]
             .color
-            .withValues(alpha: value * _layerOpacityRatios![i]);
+            .withOpacity(alpha: value * _layerOpacityRatios![i]);
       }
     }
   }
