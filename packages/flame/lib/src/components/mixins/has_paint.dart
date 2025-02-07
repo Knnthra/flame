@@ -7,14 +7,6 @@ import 'package:flame/src/effects/provider_interfaces.dart';
 import 'package:flame/src/palette.dart';
 import 'package:meta/meta.dart';
 
-/// Adds a collection of paints and paint layers to a component
-///
-/// Component will always have a main Paint that can be accessed
-/// by the [paint] attribute and other paints can be manipulated/accessed
-/// using [getPaint], [setPaint] and [deletePaint] by a paintId of generic type
-/// [T], that can be omitted if the component only has one paint.
-/// [paintLayers] paints should be drawn in list order during the render. The
-/// main Paint is the first element.
 mixin HasPaint<T extends Object> on Component
     implements OpacityProvider, PaintProvider {
   late final Map<T, Paint> _paints = {};
@@ -25,34 +17,25 @@ mixin HasPaint<T extends Object> on Component
   @internal
   List<Paint>? paintLayersInternal;
 
-  /// Gets a paint from the collection.
-  ///
-  /// Returns the main paint if no [paintId] is provided.
   Paint getPaint([T? paintId]) {
     if (paintId == null) {
       return this.paint;
     }
-
     final paint = _paints[paintId];
-
     if (paint == null) {
       throw ArgumentError('No Paint found for $paintId');
     }
-
     return paint;
   }
 
-  /// Sets a paint on the collection.
   void setPaint(T paintId, Paint paint) {
     _paints[paintId] = paint;
   }
 
-  /// Removes a paint from the collection.
   void deletePaint(T paintId) {
     _paints.remove(paintId);
   }
 
-  /// List of paints to use (in order) during render.
   List<Paint> get paintLayers {
     if (!hasPaintLayers) {
       return paintLayersInternal = [];
@@ -64,92 +47,64 @@ mixin HasPaint<T extends Object> on Component
     paintLayersInternal = paintLayers;
   }
 
-  /// Whether there are any paint layers defined for the component.
   bool get hasPaintLayers => paintLayersInternal?.isNotEmpty ?? false;
 
-  /// Manipulate the paint to make it fully transparent.
   void makeTransparent({T? paintId}) {
     setOpacity(0, paintId: paintId);
   }
 
-  /// Manipulate the paint to make it fully opaque.
   void makeOpaque({T? paintId}) {
     setOpacity(1, paintId: paintId);
   }
 
-  /// Changes the opacity of the paint.
   void setOpacity(double opacity, {T? paintId}) {
     if (opacity < 0 || opacity > 1) {
       throw ArgumentError('Opacity needs to be between 0 and 1');
     }
-
     setColor(
-      getPaint(paintId).color.withOpacity(alpha: opacity),
+      getPaint(paintId).color.withOpacity(opacity), // Fixed
       paintId: paintId,
     );
   }
 
-  /// Returns the current opacity.
   double getOpacity({T? paintId}) {
-    return getPaint(paintId).color.a;
+    return getPaint(paintId).color.opacity;
   }
 
-  /// Changes the opacity of the paint.
   void setAlpha(int alpha, {T? paintId}) {
     if (alpha < 0 || alpha > 255) {
       throw ArgumentError('Alpha needs to be between 0 and 255');
     }
-
     setColor(getPaint(paintId).color.withAlpha(alpha), paintId: paintId);
   }
 
-  /// Returns the current opacity.
   int getAlpha({T? paintId}) {
-    return getPaint(paintId).color.a ~/ 255;
+    return (getPaint(paintId).color.opacity * 255).toInt();
   }
 
-  /// Shortcut for changing the color of the paint.
   void setColor(Color color, {T? paintId}) {
     getPaint(paintId).color = color;
   }
 
-  /// Applies a color filter to the paint which will make
-  /// things rendered with the paint looking like it was
-  /// tinted with the given color.
   void tint(Color color, {T? paintId}) {
     getPaint(paintId).colorFilter = ColorFilter.mode(color, BlendMode.srcATop);
   }
 
   @override
-  double get opacity => paint.color.a;
+  double get opacity => paint.color.opacity;
 
   @override
   set opacity(double value) {
-    paint.color = paint.color.withOpacity(alpha: value);
+    paint.color = paint.color.withOpacity(value); // Fixed
     for (final paint in _paints.values) {
-      paint.color = paint.color.withOpacity(alpha: value);
+      paint.color = paint.color.withOpacity(value); // Fixed
     }
   }
 
-  /// Creates an [OpacityProvider] for given [paintId] and can be used as
-  /// `target` for [OpacityEffect].
   OpacityProvider opacityProviderOf(T paintId) {
     return _ProxyOpacityProvider(paintId, this);
   }
 
-  /// Creates an [OpacityProvider] for given list of [paintIds] and can be
-  /// used as `target` for [OpacityEffect].
-  ///
-  /// When opacities of all the given [paintIds] are not same, this provider
-  /// directly effects opacity of the most opaque paint. Additionally, it
-  /// modifies other paints such that their respective opacity ratio with most
-  /// opaque paint is maintained.
-  ///
-  /// If [paintIds] is null or empty, all the paints are used for creating the
-  /// [OpacityProvider].
-  ///
-  /// Note: Each call results in a new [OpacityProvider] and hence the cached
-  /// opacity ratios are calculated using opacities when this method was called.
   OpacityProvider opacityProviderOfList({
     List<T?>? paintIds,
     bool includeLayers = true,
@@ -189,7 +144,7 @@ class _MultiPaintOpacityProvider<T extends Object> implements OpacityProvider {
     ];
     _layerOpacityRatios = target.paintLayersInternal
         ?.map(
-          (paint) => paint.color.a / maxOpacity,
+          (paint) => paint.color.opacity / maxOpacity,
         )
         .toList(growable: false);
   }
@@ -203,7 +158,6 @@ class _MultiPaintOpacityProvider<T extends Object> implements OpacityProvider {
   @override
   double get opacity {
     var maxOpacity = 0.0;
-
     for (final paintId in paintIds) {
       maxOpacity = max(target.getOpacity(paintId: paintId), maxOpacity);
     }
@@ -211,11 +165,10 @@ class _MultiPaintOpacityProvider<T extends Object> implements OpacityProvider {
       final targetLayers = target.paintLayersInternal;
       if (targetLayers != null) {
         for (final paint in targetLayers) {
-          maxOpacity = max(paint.color.a, maxOpacity);
+          maxOpacity = max(paint.color.opacity, maxOpacity);
         }
       }
     }
-
     return maxOpacity;
   }
 
@@ -232,7 +185,7 @@ class _MultiPaintOpacityProvider<T extends Object> implements OpacityProvider {
       for (var i = 0; i < (paintLayersInternal?.length ?? 0); ++i) {
         paintLayersInternal![i].color = paintLayersInternal[i]
             .color
-            .withOpacity(alpha: value * _layerOpacityRatios![i]);
+            .withOpacity(value * _layerOpacityRatios![i]); // Fixed
       }
     }
   }
